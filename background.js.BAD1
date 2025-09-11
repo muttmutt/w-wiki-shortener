@@ -1,0 +1,123 @@
+// Minimal domain allowlist aligned with Wikimedia’s policy that w.wiki only shortens WMF-controlled domains.
+// Ref: Extension:UrlShortener / action=shortenurl API. See docs. 
+const ALLOWED_HOST_SUFFIXES = [
+  ".wikipedia.org",
+  ".wikimedia.org",
+  ".wikidata.org",
+  ".wiktionary.org",
+  ".wikisource.org",
+  ".wikinews.org",
+  ".wikiversity.org",
+  ".wikivoyage.org",
+  ".wikiquote.org"
+];
+
+const API_ENDPOINT = "https://meta.wikimedia.org/w/api.php";
+
+chrome.runtime.onInstalled.addListener(() => {
+  chrome.contextMenus.create({
+    id: "wwiki-shorten",
+    title: "Shorten with w.wiki",
+    contexts: ["page", "selection", "link", "action"]
+  });
+});
+
+chrome.contextMenus.onClicked.addListener(async (info, tab) => {
+  if (info.menuItemId === "wwiki-shorten") {
+    const targetUrl =
+      info.linkUrl || info.pageUrl || (tab && tab.url) || null;
+    if (!targetUrl) return notify("No URL found to shorten.");
+
+    handleShorten(targetUrl);
+  }
+});
+
+chrome.action.onClicked.addListener(async (tab) => {
+  const targetUrl = tab && tab.url;
+  if (!targetUrl) return notify("No URL found to shorten.");
+  handleShorten(targetUrl);
+});
+
+chrome.commands.onCommand.addListener(async (command) => {
+  if (command === "shorten-current-tab") {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    const targetUrl = tab && tab.url;
+    if (!targetUrl) return notify("No URL found to shorten.");
+    handleShorten(targetUrl);
+  }
+});
+
+function isAllowedWikimediaUrl(u) {
+  try {
+    const h = new URL(u).hostname;
+    return ALLOWED_HOST_SUFFIXES.some(sfx => h === sfx.slice(1) || h.endsWith(sfx));
+  } catch {
+    return false;
+  }
+}
+
+async function handleShorten(longUrl) {
+  if (!isAllowedWikimediaUrl(longUrl)) {
+    return notify("This URL isn’t on a Wikimedia site. w.wiki only accepts WMF domains.");
+  }
+
+  try {
+    const params = new URLSearchParams();
+    params.set("action", "shortenurl");
+    params.set("format", "json");
+    params.set("url", longUrl);
+
+    // POST to Meta-Wiki Action API
+    const resp = await fetch(API_ENDPOINT, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: params.toString(),
+      // CORS: Meta supports CORS for the Action API.
+      // No credentials required for this module when shortening WMF URLs.
+      mode: "cors"
+    });
+
+    if (!resp.ok) {
+      throw new Error(`HTTP ${resp.status}`);
+    }
+
+    const data = await resp.json();
+    // Expected shape:
+    // { "shortenurl": { "shorturl": "https://w.wiki/..." } }
+    const shortUrl = data?.shortenurl?.shorturl;
+    if (!shortUrl) {
+      throw new Error("Unexpected API response.");
+    }
+
+    await copyToClipboard(shortUrl);
+    notify(`Copied: ${shortUrl}`);
+  } catch (err) {
+    console.error("Shorten failed:", err);
+    notify("Shortening failed. See console for details.");
+  }
+}
+
+async function copyToClipboard(text) {
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch {
+    // Fallback via temporary tab injection
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!tab?.id) throw new Error("No active tab for clipboard fallback.");
+
+    await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      func: (t) => navigator.clipboard.writeText(t),
+      args: [text]
+    });
+  }
+}
+
+function notify(message) {
+  chrome.notifications.create({
+    type: "basic",
+    iconUrl: "icon48.png",
+    title: "w.wiki Shortener",
+    message
+  }, () => {});
+}

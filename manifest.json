@@ -1,0 +1,47 @@
+{
+  "manifest_version": 3,
+  "name": "w.wiki Shortener",
+  "description": "Shorten current Wikimedia/Wikipedia URL to w.wiki and copy it.",
+  "version": "1.0.1",
+  "action": {
+    "default_title": "Shorten with w.wiki"
+  },
+  "permissions": [
+    "activeTab",
+    "clipboardWrite",
+    "notifications",
+    "contextMenus",
+    "storage",
+    "scripting"
+  ],
+  "host_permissions": [
+    "https://*.wikipedia.org/*",
+    "https://*.wikimedia.org/*",
+    "https://*.wikidata.org/*",
+    "https://*.wiktionary.org/*",
+    "https://*.wikisource.org/*",
+    "https://*.wikinews.org/*",
+    "https://*.wikiversity.org/*",
+    "https://*.wikivoyage.org/*",
+    "https://*.wikiquote.org/*",
+    "https://meta.wikimedia.org/w/api.php"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "commands": {
+    "shorten-current-tab": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+U",
+        "mac": "Command+Shift+U"
+      },
+      "description": "Shorten current tab with w.wiki"
+    }
+  },
+  "icons": {
+    "16": "icon16.png",
+    "32": "icon32.png",
+    "48": "icon48.png",
+    "128": "icon128.png"
+  }
+}

@@ -1,0 +1,11 @@
+# macOS / OS junk
+.DS_Store
+
+# Extension packaging artifacts
+*.crx
+*.pem
+*.zip
+
+# Logs / backups
+*.log
+*.bak
